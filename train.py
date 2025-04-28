@@ -1,3 +1,4 @@
+# train.py – Fine-tune LoRA adapters with training loop, scheduler, and checkpointing.
 import os
 from utils import setup_logging, set_seed, get_device, get_package_version
 from data import get_dataloaders
@@ -8,7 +9,7 @@ from transformers import get_linear_schedule_with_warmup
 from transformers import AutoTokenizer
 from peft import PeftModel
 
-# ── Configuration ─────────────────────────────────────────────────────────
+# ── Configuration: dataset, model, hyperparameters, and output directory.
 model_name         = "sshleifer/distilbart-cnn-12-6"
 dataset_name       = "cnn_dailymail"
 dataset_config     = "3.0.0"
@@ -25,11 +26,13 @@ logger = setup_logging()
 set_seed()
 device = get_device()
 
+# Log software versions and device details for reproducibility.
 logger.info(f"PyTorch version: {get_package_version('torch')}")
 logger.info(f"Transformers version: {get_package_version('transformers')}")
 logger.info(f"PEFT version: {get_package_version('peft')}")
 logger.info(f"Datasets version: {get_package_version('datasets')}")
 
+# Main training loop: forward, backward, gradient accumulation, and checkpoint saving.
 def train(model, train_loader, val_loader, device, output_dir):
     """Training loop with LoRA adapter saving and logging."""
     logger.info("Starting training")
@@ -48,11 +51,13 @@ def train(model, train_loader, val_loader, device, output_dir):
         logger.info(f"Epoch {epoch+1}/{num_epochs}")
         for step, batch in enumerate(tqdm(train_loader, desc=f"Epoch {epoch+1}")):
             batch = {k: v.to(device) for k, v in batch.items()}
+            # Forward pass: compute loss on current batch.
             outputs = model(**batch)
             loss = outputs.loss / grad_accum
             loss.backward()
             epoch_loss += loss.item() * grad_accum
 
+            # Perform optimizer update and scheduler step after gradient accumulation.
             if (step + 1) % grad_accum == 0:
                 optimizer.step()
                 scheduler.step()
@@ -65,12 +70,12 @@ def train(model, train_loader, val_loader, device, output_dir):
         # reset epoch_loss for next epoch
         epoch_loss = 0.0
 
-        # Save after each epoch
+        # Save model state for this epoch under output directory.
         ckpt = os.path.join(output_dir, f"checkpoint-epoch-{epoch+1}")
         model.save_pretrained(ckpt)
         logger.info(f"Saved checkpoint to {ckpt}")
 
-    # --- Save PEFT Adapter ---
+    # After training, save LoRA adapter weights and tokenizer.
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     logger.info(f"Saving final PEFT adapter to {output_dir}")
