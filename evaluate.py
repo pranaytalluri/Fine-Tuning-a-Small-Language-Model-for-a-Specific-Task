@@ -1,3 +1,4 @@
+# evaluate.py – Compute ROUGE and BLEU for fine-tuned model on validation set.
 from utils import setup_logging, set_seed, get_device
 from data import get_dataloaders
 from model import build_model
@@ -19,6 +20,7 @@ logger = setup_logging()
 set_seed()
 device = get_device()
 
+# Run model inference on validation data and compute metrics.
 def evaluate():
     logger.info(f"Evaluating model from {output_dir}")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -41,10 +43,12 @@ def evaluate():
     model.eval()
     preds, refs = [], []
     for batch in val_loader:
+        # Generate model summaries for the current batch.
         inputs = batch["input_ids"].to(device)
         attn   = batch["attention_mask"].to(device)
         out    = model.generate(inputs, attention_mask=attn, max_new_tokens=128)
 
+        # Decode texts and compute aggregate ROUGE and BLEU scores.
         dec_preds = tokenizer.batch_decode(out, skip_special_tokens=True)
         dec_refs  = tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
 
