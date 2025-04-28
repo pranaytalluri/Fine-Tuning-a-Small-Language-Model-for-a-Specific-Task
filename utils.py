@@ -1,8 +1,10 @@
+# utils.py – Utility functions for logging, seeding, device selection, and version checks.
 import random
 import numpy as np
 import torch
 import logging
 from importlib.metadata import version, PackageNotFoundError
+
 
 def setup_logging(level: int = logging.INFO) -> logging.Logger:
     """
@@ -49,7 +51,7 @@ def get_package_version(pkg_name: str) -> str:
 
 def check_gpu_availability(logger: logging.Logger = None) -> bool:
     """
-    Check for GPU availability and log device details.
+    Detect available GPU or MPS device and log status.
     Returns True if CUDA or MPS is available.
     """
     lg = logger or logging.getLogger(__name__)
@@ -69,8 +71,8 @@ def check_gpu_availability(logger: logging.Logger = None) -> bool:
 
 def get_model_load_kwargs() -> dict:
     """
-    Return keyword arguments for HuggingFace `from_pretrained`:
-    device_map and torch_dtype keyed to the best available device.
+    Choose device_map and dtype based on available hardware.
+    Return keyword arguments for HuggingFace `from_pretrained`.
     """
     device = get_device()
     if device.type in ("cuda", "mps"):
@@ -80,8 +82,10 @@ def get_model_load_kwargs() -> dict:
 
 def print_package_versions(pkg_names: list, logger: logging.Logger = None) -> None:
     """
-    Log the versions of the given packages.
+    Log installed package versions for specified packages.
     """
     lg = logger or logging.getLogger(__name__)
+    # Log installed package versions for specified packages.
     for pkg in pkg_names:
         lg.info(f"{pkg} version: {get_package_version(pkg)}")
+
