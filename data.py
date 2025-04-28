@@ -1,3 +1,4 @@
+# data.py – Load, preprocess, and prepare summarization datasets for PyTorch.
 # data.py
 
 import logging
@@ -9,6 +10,7 @@ from utils import setup_logging
 
 logger = setup_logging()
 
+# PyTorch Dataset wrapper converting tokenized inputs into tensors.
 class SummarizationDataset(Dataset):
     """Wrap a Hugging Face Dataset for PyTorch DataLoader, converting features to torch.Tensor."""
     def __init__(self, hf_dataset):
@@ -37,10 +39,11 @@ def get_dataloaders(
     Load and preprocess summarization datasets via Hugging Face Datasets.
     Returns train, val, test DataLoaders.
     """
+    # Load the CNN/DailyMail dataset via Hugging Face Datasets.
     logger.info(f"Loading dataset: {dataset_name}/{dataset_config}")
     ds = load_dataset(dataset_name, dataset_config)
 
-    # Sample only 1% of each split to reduce memory usage
+    # Subsample each split (3%) to limit memory usage.
     frac = 0.03
     train_n = max(1, int(len(ds["train"]) * frac))
     val_n   = max(1, int(len(ds["validation"]) * frac))
@@ -49,12 +52,14 @@ def get_dataloaders(
     ds["validation"] = ds["validation"].shuffle(seed=42).select(range(val_n))
     ds["test"]       = ds["test"].shuffle(seed=42).select(range(test_n))
 
-    # Identify fields
+    # Identify source text and target summary columns.
     input_key  = "article"
     target_key = "highlights" if "highlights" in ds["train"].column_names else "summary"
 
+    # Initialize tokenizer for the chosen model.
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
+    # Preprocessing: prefix articles and tokenize inputs and summaries.
     def preprocess(batch):
         # Add explicit prefix
         texts   = ["Article: " + t for t in batch[input_key]]
@@ -79,7 +84,7 @@ def get_dataloaders(
         enc_inputs["labels"] = enc_targets["input_ids"]
         return enc_inputs
 
-    # Map & remove original columns
+    # Apply preprocessing and drop raw columns.
     train_hf = ds["train"].map(
         preprocess,
         batched=True,
@@ -96,12 +101,12 @@ def get_dataloaders(
         remove_columns=ds["test"].column_names,
     )
 
-    # Wrap in our PyTorch Dataset
+    # Wrap tokenized data into PyTorch Dataset objects.
     train_ds = SummarizationDataset(train_hf)
     val_ds   = SummarizationDataset(val_hf)
     test_ds  = SummarizationDataset(test_hf)
 
-    # Create DataLoaders
+    # Create DataLoader for batching during training and evaluation.
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     val_loader   = DataLoader(val_ds,   batch_size=batch_size)
     test_loader  = DataLoader(test_ds,  batch_size=batch_size)
